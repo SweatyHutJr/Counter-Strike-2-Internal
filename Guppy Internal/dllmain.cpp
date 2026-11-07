@@ -4,11 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
-#include <array>    
-#include <mutex>
-#include "MinHook.h"
-#pragma comment(lib, "d3dcompiler.lib")
-
+#include <array>
 #include <cmath>
 #include "buttons.hpp"
 #include "client_dll.hpp"
@@ -16,8 +12,6 @@
 
 #include <d3d11.h>
 #include <dxgi.h>
-#include <d3dcompiler.h>
-#pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
@@ -25,7 +19,11 @@
 #include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_dx11.h"
 
-std::vector<UINT> g_LoggedIndexCounts;
+// scenesystem.dll
+#define GENERATEPRIMITIVES_PATTERN "48 8B C4 48 89 58 ? 4C 89 40 ? 48 89 50"
+// materialsystem2.dll
+#define CREATEMATERIAL_PATTERN "48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 41 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 8B F2"
+
 
 template <typename T>
 T read(uintptr_t address) {
@@ -321,48 +319,6 @@ void RunTriggerbot(uintptr_t clientBase, uintptr_t local_pawn, uintptr_t entityL
     }
 }
 
-typedef void(__stdcall* tDrawIndexed)(ID3D11DeviceContext*, UINT, UINT, INT);
-tDrawIndexed oDrawIndexed = nullptr;
-
-// Your chams shader (needs to be created after device creation)
-ID3D11PixelShader* g_pChamsShader = nullptr;
-
-/* void __stdcall hkDrawIndexed(ID3D11DeviceContext* pContext, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
-{
-    // Do absolutely nothing. Just return.
-    // If the game crashes now, the hook placement is wrong.
-    return;
-}
-*/
-
-ID3D11PixelShader* CreateSolidColorShader(ID3D11Device* device, float r, float g, float b, float a) {
-    const char* shaderCode = R"(
-        float4 main() : SV_Target {
-            return float4(%f, %f, %f, %f);
-        }
-    )";
-
-    char buffer[512];
-    sprintf_s(buffer, shaderCode, r, g, b, a);
-
-    ID3DBlob* pBlob = nullptr;
-    ID3DBlob* pError = nullptr;
-
-    HRESULT hr = D3DCompile(buffer, strlen(buffer), nullptr, nullptr, nullptr, "main", "ps_5_0", 0, 0, &pBlob, &pError);
-
-    if (FAILED(hr)) {
-        printf("Shader compilation failed: %s\n", (char*)pError->GetBufferPointer());
-        pError->Release();
-        return nullptr;
-    }
-
-    ID3D11PixelShader* pShader = nullptr;
-    device->CreatePixelShader(pBlob->GetBufferPointer(), pBlob->GetBufferSize(), nullptr, &pShader);
-
-    pBlob->Release();
-    return pShader;
-}
-
 DWORD WINAPI MainThread(HMODULE hModule)
 {
     AllocConsole();
@@ -464,13 +420,8 @@ DWORD WINAPI MainThread(HMODULE hModule)
         return 0;
     }
 
+    InitImGui(hwndOverlay);
 
-   /*
-    MH_Initialize();
-    void** pVTable = *(void***)pd3dDeviceContext;
-    MH_CreateHook(pVTable[12], &hkDrawIndexed, reinterpret_cast<LPVOID*>(&oDrawIndexed));
-    MH_EnableHook(pVTable[12]);
-   */
     const auto entityList = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwEntityList);
     const auto viewMatrixPtr = clientBase + exitscam::offsets::client_dll::dwViewMatrix;
 
@@ -484,14 +435,6 @@ DWORD WINAPI MainThread(HMODULE hModule)
 
     while (msg.message != WM_QUIT)
     {
-        // Safely print the logged index counts from the main thread
-        if (!g_LoggedIndexCounts.empty()) {
-            printf("Logged IndexCounts > 3000:\n");
-            for (UINT val : g_LoggedIndexCounts) {
-                printf("- %u\n", val);
-            }
-            g_LoggedIndexCounts.clear(); // Clear so it doesn't spam
-        }
         if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -691,6 +634,7 @@ DWORD WINAPI MainThread(HMODULE hModule)
         pd3dDeviceContext->ClearRenderTargetView(mainRenderTargetView, clear_color_with_alpha);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         swapChain->Present(0, 0);
+
         Sleep(1);
     }
 
