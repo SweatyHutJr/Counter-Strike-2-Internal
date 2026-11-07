@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Guppy Internal/Guppy Internal.vcxproj" Id="e5f2640c-06a0-4a31-a0e7-f4ac53ac71ea" />
+</Solution>
