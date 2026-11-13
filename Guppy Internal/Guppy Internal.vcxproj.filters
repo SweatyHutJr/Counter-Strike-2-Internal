@@ -69,6 +69,9 @@
     <ClInclude Include="buffer.h">
       <Filter>Source Files\MinHook</Filter>
     </ClInclude>
+    <ClInclude Include="scenesystem_dll.hpp">
+      <Filter>Source Files\Offsets</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

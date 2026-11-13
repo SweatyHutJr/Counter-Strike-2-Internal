@@ -170,6 +170,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="offsets.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="scenesystem_dll.hpp" />
     <ClInclude Include="trampoline.h" />
   </ItemGroup>
   <ItemGroup>
