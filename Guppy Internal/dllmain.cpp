@@ -1,374 +1,22 @@
-#include "pch.h"
-#include <Windows.h>
 #include <iostream>
-#include <cstdint>
-#include <vector>
-#include <unordered_map>
 #include <array>    
-#include <mutex>
-#include "MinHook.h"
-#pragma comment(lib, "d3dcompiler.lib")
-
-#include <cmath>
 #include "buttons.hpp"
 #include "client_dll.hpp"
 #include "offsets.h"
-
-#include <d3d11.h>
-#include <dxgi.h>
-#include <d3dcompiler.h>
-#pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "d3d11.lib")
-#pragma comment(lib, "dxgi.lib")
-
-#include "imgui.h"
-#include "backends/imgui_impl_win32.h"
-#include "backends/imgui_impl_dx11.h"
+#include "input.h"
+#include "cheats.h"
+#include "DX11ImGui.h"
 
 std::vector<UINT> g_LoggedIndexCounts;
 
-template <typename T>
-T read(uintptr_t address) {
-    if (!address) return T{};
-    __try {
-        return *reinterpret_cast<T*>(address);
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {
-        return T{};
-    }
-}
 
-template <typename T>
-void write(uintptr_t address, T value) {
-    if (!address) return;
-    __try {
-        *reinterpret_cast<T*>(address) = value;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {}
-}
-
-static ID3D11Device* pd3dDevice = nullptr;
-static ID3D11DeviceContext* pd3dDeviceContext = nullptr;
-static IDXGISwapChain* swapChain = nullptr;
-static ID3D11RenderTargetView* mainRenderTargetView = nullptr;
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-        return true;
-    return DefWindowProc(hWnd, msg, wParam, lParam);
-}
-
-bool CreateDeviceD3D(HWND hWnd) {
-    RECT rc;
-    GetClientRect(hWnd, &rc);
-    if (rc.right == 0 || rc.bottom == 0) {
-        printf("Window has zero size! Aborting.\n");
-        return false;
-    }
-
-    DXGI_SWAP_CHAIN_DESC sd;
-    ZeroMemory(&sd, sizeof(sd));
-    sd.BufferCount = 1;
-    sd.BufferDesc.Width = rc.right;
-    sd.BufferDesc.Height = rc.bottom;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = hWnd;
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-    sd.Windowed = TRUE;
-    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-    D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevelArray[] = {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-        D3D_FEATURE_LEVEL_9_3,
-        D3D_FEATURE_LEVEL_9_2,
-        D3D_FEATURE_LEVEL_9_1
-    };
-
-    HRESULT hr = D3D11CreateDeviceAndSwapChain(
-        NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
-        featureLevelArray, _countof(featureLevelArray),
-        D3D11_SDK_VERSION, &sd, &swapChain, &pd3dDevice,
-        &featureLevel, &pd3dDeviceContext
-    );
-
-    if (FAILED(hr)) {
-        printf("DX11 Init Failed! HRESULT: 0x%X\n", hr);
-        return false;
-    }
-
-    ID3D11Texture2D* pBackBuffer = nullptr;
-    if (FAILED(swapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer))) || !pBackBuffer)
-        return false;
-
-    pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &mainRenderTargetView);
-    pBackBuffer->Release();
-    return true;
-}
-
-void InitImGui(HWND hWnd) {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-    ImGui::StyleColorsDark();
-    ImGui_ImplWin32_Init(hWnd);
-    ImGui_ImplDX11_Init(pd3dDevice, pd3dDeviceContext);
-}
-
-struct Vector3 { float x, y, z; };
-struct Vector2 { float x, y; };
-struct QAngle { float x, y, z; };
-struct oldOrigin { float cords[3]; };
-struct nameBuf { char data[128]; };
-
-struct CheatSettings {
-    bool espEnabled = true; // Added ESP toggle
-    bool teamCheck = true;
-    bool triggerbotEnabled = false;
-    bool aimbotEnabled = false;
-    bool bhopEnabled = true;
-
-    float aimbotSmooth = 3.5f;
-    float aimbotFov = 5.0f;
-
-    bool isTriggering = false;
-} settings;
-
-bool getBonePosition(std::uintptr_t pawn, int boneIndex, Vector3& out, uintptr_t boneArray) {
-    if (boneIndex < 0 || boneIndex > 127)
-        return false;
-    Vector3 bone = read<Vector3>(boneArray + (boneIndex * 0x20));
-
-    if (std::isnan(bone.x) || std::isnan(bone.y) || std::isnan(bone.z))
-        return false;
-    if (bone.x == 0.0f && bone.y == 0.0f && bone.z == 0.0f)
-        return false;
-    if (std::abs(bone.x) > 15000.0f || std::abs(bone.y) > 15000.0f || std::abs(bone.z) > 15000.0f)
-        return false;
-
-    out.x = bone.x;
-    out.y = bone.y;
-    out.z = bone.z;
-    return true;
-}
-
-bool worldToScreen(const Vector3& pos, Vector2& screen, const float matrix[16], int windowWidth, int windowHeight) {
-    float w = matrix[12] * pos.x + matrix[13] * pos.y + matrix[14] * pos.z + matrix[15];
-    if (w < 0.01f)
-        return false;
-
-    float x = matrix[0] * pos.x + matrix[1] * pos.y + matrix[2] * pos.z + matrix[3];
-    float y = matrix[4] * pos.x + matrix[5] * pos.y + matrix[6] * pos.z + matrix[7];
-
-    screen.x = (windowWidth / 2.0f) * (x / w + 1.0f);
-    screen.y = (windowHeight / 2.0f) * (1.0f - (y / w));
-    return true;
-}
-
-QAngle CalcAngle(const Vector3& src, const Vector3& dst) {
-    QAngle angles;
-    Vector3 delta = { dst.x - src.x, dst.y - src.y, dst.z - src.z };
-    float hyp = sqrt(delta.x * delta.x + delta.y * delta.y);
-    angles.x = atan2f(-delta.z, hyp) * (180.0f / 3.14159265358979323846f);
-    angles.y = atan2f(delta.y, delta.x) * (180.0f / 3.14159265358979323846f);
-    angles.z = 0.0f;
-    return angles;
-}
-
-void HandleInputs() {
-    // Shifted hotkeys up by one
-    if (GetAsyncKeyState(VK_F1) & 1) settings.espEnabled = !settings.espEnabled;
-    if (GetAsyncKeyState(VK_F2) & 1) settings.teamCheck = !settings.teamCheck;
-    if (GetAsyncKeyState(VK_F3) & 1) settings.triggerbotEnabled = !settings.triggerbotEnabled;
-    if (GetAsyncKeyState(VK_F4) & 1) settings.aimbotEnabled = !settings.aimbotEnabled;
-    if (GetAsyncKeyState(VK_F5) & 1) settings.bhopEnabled = !settings.bhopEnabled;
-
-    if (GetAsyncKeyState(VK_OEM_MINUS) & 1) {
-        settings.aimbotSmooth -= 0.5f;
-        if (settings.aimbotSmooth < 1.0f) settings.aimbotSmooth = 1.0f;
-    }
-    if (GetAsyncKeyState(VK_OEM_PLUS) & 1) {
-        settings.aimbotSmooth += 0.5f;
-        if (settings.aimbotSmooth > 15.0f) settings.aimbotSmooth = 15.0f;
-    }
-    if (GetAsyncKeyState(VK_OEM_4) & 1) {
-        settings.aimbotFov -= 1.0f;
-        if (settings.aimbotFov < 1.0f) settings.aimbotFov = 1.0f;
-    }
-    if (GetAsyncKeyState(VK_OEM_6) & 1) {
-        settings.aimbotFov += 1.0f;
-        if (settings.aimbotFov > 45.0f) settings.aimbotFov = 45.0f;
-    }
-}
-
-void RunBhop(uintptr_t local_pawn, uintptr_t clientBase) {
-    if (!settings.bhopEnabled) return;
-
-    const auto flags = read<std::uint32_t>(local_pawn + exitscam::schemas::client_dll::C_BaseEntity::m_fFlags);
-    const bool in_air = flags & (1 << 0);
-    const bool space_pressed = GetAsyncKeyState(VK_SPACE);
-    const auto force_jump = read<DWORD>(clientBase + exitscam::buttons::jump);
-
-    if (space_pressed && in_air) {
-        Sleep(5);
-        write(clientBase + exitscam::buttons::jump, 65537);
-    }
-    else if (space_pressed && !in_air) {
-        write(clientBase + exitscam::buttons::jump, 256);
-    }
-    else if (!space_pressed && force_jump == 65537) {
-        write(clientBase + exitscam::buttons::jump, 256);
-    }
-}
-
-void RunAimbot(uintptr_t clientBase, uintptr_t local_pawn, const std::vector<uintptr_t>& cachedPawns, std::unordered_map<uintptr_t, uintptr_t>& boneArrayCache, const Vector3& localEye, int localteam) {
-    if (!settings.aimbotEnabled || !(GetAsyncKeyState(VK_RBUTTON) & 0x8000)) return;
-
-    float bestFov = settings.aimbotFov;
-    Vector3 bestTargetPos = { 0, 0, 0 };
-    bool targetFound = false;
-    QAngle currentAngle = read<QAngle>(clientBase + exitscam::offsets::client_dll::dwViewAngles);
-
-    for (uintptr_t CSPlayerPawnPtr : cachedPawns) {
-        int team = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
-        int health = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
-
-        if (settings.teamCheck && team == localteam) continue;
-        if (health <= 0 || health > 100) continue;
-
-        uintptr_t boneArray = boneArrayCache[CSPlayerPawnPtr];
-        Vector3 headPos;
-        if (boneArray != 0 && getBonePosition(CSPlayerPawnPtr, 7, headPos, boneArray)) {
-            bool isSpotted = read<bool>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_CSPlayerPawn::m_entitySpottedState + 0x8);
-            if (!isSpotted) continue;
-
-            QAngle targetAngle = CalcAngle(localEye, headPos);
-            float fovX = std::abs(targetAngle.x - currentAngle.x);
-            float fovY = std::abs(targetAngle.y - currentAngle.y);
-            float totalFov = sqrt(fovX * fovX + fovY * fovY);
-
-            if (totalFov < bestFov) {
-                bestFov = totalFov;
-                bestTargetPos = headPos;
-                targetFound = true;
-            }
-        }
-    }
-
-    if (targetFound) {
-        QAngle targetAngle = CalcAngle(localEye, bestTargetPos);
-        while (targetAngle.y > 180.0f) targetAngle.y -= 360.0f;
-        while (targetAngle.y < -180.0f) targetAngle.y += 360.0f;
-
-        QAngle newAngle;
-        newAngle.x = currentAngle.x + (targetAngle.x - currentAngle.x) / settings.aimbotSmooth;
-        newAngle.y = currentAngle.y + (targetAngle.y - currentAngle.y) / settings.aimbotSmooth;
-        newAngle.z = 0.0f;
-
-        write(clientBase + exitscam::offsets::client_dll::dwViewAngles, newAngle);
-    }
-}
-
-void RunTriggerbot(uintptr_t clientBase, uintptr_t local_pawn, uintptr_t entityList, int localTeam, int localHealth) {
-    if (!settings.triggerbotEnabled) {
-        if (settings.isTriggering) {
-            write(clientBase + exitscam::buttons::attack, 256);
-            settings.isTriggering = false;
-        }
-        return;
-    }
-
-    bool shouldShoot = false;
-    if (localHealth > 0) {
-        int crosshairEntIndex = read<int>(local_pawn + exitscam::schemas::client_dll::C_CSPlayerPawn::m_iIDEntIndex);
-        if (crosshairEntIndex != -1) {
-            uintptr_t triggerListEntry2 = read<uintptr_t>(entityList + 0x8 * ((crosshairEntIndex & 0x7FFF) >> 9) + 0x10);
-            if (triggerListEntry2) {
-                uintptr_t targetPawn = read<uintptr_t>(triggerListEntry2 + 0x70 * (crosshairEntIndex & 0x1FF));
-                if (targetPawn) {
-                    int targetHealth = read<int>(targetPawn + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
-                    int targetTeam = read<int>(targetPawn + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
-                    if (targetHealth > 0 && targetHealth <= 100) {
-                        if (!settings.teamCheck || targetTeam != localTeam) shouldShoot = true;
-                    }
-                }
-            }
-        }
-    }
-
-    if (shouldShoot) {
-        if (!settings.isTriggering) {
-            Sleep(17 + (rand() % 12));
-            write(clientBase + exitscam::buttons::attack, 65537);
-            settings.isTriggering = true;
-        }
-    }
-    else {
-        if (settings.isTriggering) {
-            write(clientBase + exitscam::buttons::attack, 256);
-            settings.isTriggering = false;
-        }
-    }
-}
-
-typedef void(__stdcall* tDrawIndexed)(ID3D11DeviceContext*, UINT, UINT, INT);
-tDrawIndexed oDrawIndexed = nullptr;
-
-// Your chams shader (needs to be created after device creation)
-ID3D11PixelShader* g_pChamsShader = nullptr;
-
-/* void __stdcall hkDrawIndexed(ID3D11DeviceContext* pContext, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
-{
-    // Do absolutely nothing. Just return.
-    // If the game crashes now, the hook placement is wrong.
-    return;
-}
-*/
-
-ID3D11PixelShader* CreateSolidColorShader(ID3D11Device* device, float r, float g, float b, float a) {
-    const char* shaderCode = R"(
-        float4 main() : SV_Target {
-            return float4(%f, %f, %f, %f);
-        }
-    )";
-
-    char buffer[512];
-    sprintf_s(buffer, shaderCode, r, g, b, a);
-
-    ID3DBlob* pBlob = nullptr;
-    ID3DBlob* pError = nullptr;
-
-    HRESULT hr = D3DCompile(buffer, strlen(buffer), nullptr, nullptr, nullptr, "main", "ps_5_0", 0, 0, &pBlob, &pError);
-
-    if (FAILED(hr)) {
-        printf("Shader compilation failed: %s\n", (char*)pError->GetBufferPointer());
-        pError->Release();
-        return nullptr;
-    }
-
-    ID3D11PixelShader* pShader = nullptr;
-    device->CreatePixelShader(pBlob->GetBufferPointer(), pBlob->GetBufferSize(), nullptr, &pShader);
-
-    pBlob->Release();
-    return pShader;
-}
 
 DWORD WINAPI MainThread(HMODULE hModule)
 {
     AllocConsole();
     FILE* f;
     freopen_s(&f, "CONOUT$", "w", stdout);
-    printf("Console Created\n");
+    printf("Console created\n");
 
     uintptr_t clientBase = 0;
     while (!(clientBase = reinterpret_cast<uintptr_t>(GetModuleHandleA("client.dll")))) {
@@ -405,7 +53,7 @@ DWORD WINAPI MainThread(HMODULE hModule)
         }
     }
 
-    std::cout << "CS2 Window Found: " << hwnd << std::endl;
+    printf("CS2 window found!\n");
 
     RECT cr;
     GetClientRect(hwnd, &cr);
@@ -464,13 +112,9 @@ DWORD WINAPI MainThread(HMODULE hModule)
         return 0;
     }
 
+    InitImGui(hwndOverlay);
+    printf("ImGui initialized.\n");
 
-   /*
-    MH_Initialize();
-    void** pVTable = *(void***)pd3dDeviceContext;
-    MH_CreateHook(pVTable[12], &hkDrawIndexed, reinterpret_cast<LPVOID*>(&oDrawIndexed));
-    MH_EnableHook(pVTable[12]);
-   */
     const auto entityList = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwEntityList);
     const auto viewMatrixPtr = clientBase + exitscam::offsets::client_dll::dwViewMatrix;
 
@@ -484,13 +128,12 @@ DWORD WINAPI MainThread(HMODULE hModule)
 
     while (msg.message != WM_QUIT)
     {
-        // Safely print the logged index counts from the main thread
         if (!g_LoggedIndexCounts.empty()) {
             printf("Logged IndexCounts > 3000:\n");
             for (UINT val : g_LoggedIndexCounts) {
                 printf("- %u\n", val);
             }
-            g_LoggedIndexCounts.clear(); // Clear so it doesn't spam
+            g_LoggedIndexCounts.clear();
         }
         if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
             TranslateMessage(&msg);
@@ -507,9 +150,15 @@ DWORD WINAPI MainThread(HMODULE hModule)
         ClientToScreen(hwnd, &gameTl);
         SetWindowPos(hwndOverlay, HWND_TOPMOST, gameTl.x, gameTl.y, gameRect.right, gameRect.bottom, SWP_NOACTIVATE);
 
-        if (GetForegroundWindow() != hwnd) {
-            Sleep(50);
-            continue;
+        if (GetForegroundWindow() != hwnd) { Sleep(50); continue; }
+
+        if (!pd3dDevice || !pd3dDeviceContext || !swapChain || !mainRenderTargetView) {
+            printf("NULL D3D ptrs: dev=%p ctx=%p sc=%p rtv=%p\n",
+                pd3dDevice, pd3dDeviceContext, swapChain, mainRenderTargetView);
+            Sleep(50); continue;
+        }
+        if (!ImGui::GetCurrentContext()) {
+            printf("No ImGui context!\n"); Sleep(50); continue;
         }
 
         RECT rect;
@@ -523,7 +172,7 @@ DWORD WINAPI MainThread(HMODULE hModule)
 
         ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
 
-        HandleInputs();
+        handleInputs();
 
         const auto local_player_pawn = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwLocalPlayerPawn);
 
@@ -536,7 +185,7 @@ DWORD WINAPI MainThread(HMODULE hModule)
 
             uintptr_t listEntry = read<uintptr_t>(entityList + 0x10);
 
-            if (listEntry && (GetTickCount64() - lastCacheTime > 500 || cachedControllers.empty())) {
+            if (listEntry && (GetTickCount64() - lastCacheTime > 3000 || cachedControllers.empty())) {
                 cachedControllers.clear();
                 cachedPawns.clear();
                 boneArrayCache.clear();
@@ -563,13 +212,11 @@ DWORD WINAPI MainThread(HMODULE hModule)
             oldOrigin localPos = read<oldOrigin>(local_player_pawn + exitscam::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
             Vector3 localEye = { localPos.cords[0], localPos.cords[1], localPos.cords[2] + 64.0f };
 
-            // FOV Circle (Purple)
             if (settings.aimbotEnabled) {
                 float radiusInPixels = (rect.bottom / 2.0f) * tanf(settings.aimbotFov * (3.14159265f / 180.0f));
                 draw_list->AddCircle(ImVec2((float)centerX, (float)centerY), radiusInPixels, IM_COL32(200, 100, 255, 255), 0, 1.5f);
             }
 
-            // ESP Drawing Loop wrapped in settings.espEnabled check
             if (settings.espEnabled) {
                 for (size_t p = 0; p < cachedPawns.size(); p++) {
                     uintptr_t playerController = cachedControllers[p];
@@ -681,7 +328,7 @@ DWORD WINAPI MainThread(HMODULE hModule)
                 }
             }
 
-            RunAimbot(clientBase, local_player_pawn, cachedPawns, boneArrayCache, localEye, localTeam);
+            runAimbot(clientBase, local_player_pawn, cachedPawns, boneArrayCache, localEye, localTeam);
             RunTriggerbot(clientBase, local_player_pawn, entityList, localTeam, localHealth);
         }
 
@@ -690,13 +337,27 @@ DWORD WINAPI MainThread(HMODULE hModule)
         const float clear_color_with_alpha[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         pd3dDeviceContext->ClearRenderTargetView(mainRenderTargetView, clear_color_with_alpha);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-        swapChain->Present(0, 0);
-        Sleep(1);
+
+        HRESULT hrPresent = swapChain->Present(0, 0);
+        if (hrPresent == DXGI_ERROR_DEVICE_REMOVED || hrPresent == DXGI_ERROR_DEVICE_RESET) {
+            printf("Device removed/reset on Present (0x%X). Breaking.\n", hrPresent);
+            break;
+        }
+
+        Sleep(30);
     }
 
-    ImGui_ImplDX11_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
+    if (ImGui::GetCurrentContext()) {
+        ImGui_ImplDX11_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+    }
+
+    if (mainRenderTargetView) { mainRenderTargetView->Release(); mainRenderTargetView = nullptr; }
+    if (swapChain) { swapChain->Release();           swapChain = nullptr; }
+    if (pd3dDeviceContext) { pd3dDeviceContext->Release();   pd3dDeviceContext = nullptr; }
+    if (pd3dDevice) { pd3dDevice->Release();          pd3dDevice = nullptr; }
+
     DestroyWindow(hwndOverlay);
     FreeConsole();
     FreeLibraryAndExitThread(hModule, 0);

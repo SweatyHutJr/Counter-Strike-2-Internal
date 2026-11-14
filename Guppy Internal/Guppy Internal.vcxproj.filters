@@ -72,6 +72,15 @@
     <ClInclude Include="scenesystem_dll.hpp">
       <Filter>Source Files\Offsets</Filter>
     </ClInclude>
+    <ClInclude Include="DX11ImGui.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="input.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cheats.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

@@ -166,8 +166,11 @@
     <ClInclude Include="..\..\..\..\Downloads\imgui-1.93.0\imgui-1.93.0\imstb_truetype.h" />
     <ClInclude Include="buffer.h" />
     <ClInclude Include="buttons.hpp" />
+    <ClInclude Include="cheats.h" />
     <ClInclude Include="client_dll.hpp" />
+    <ClInclude Include="DX11ImGui.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="input.h" />
     <ClInclude Include="offsets.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="scenesystem_dll.hpp" />
