@@ -26,11 +26,11 @@ exactly over the game with no manual positioning.
 ### Triggerbot
 - Auto-fires when crosshair is on an enemy
 - Respects team check
-- Configurable via F3
+- Toggle via F3
 
 ### Bunnyhop
 - Hold **SPACE** to auto-bhop
-- Master toggle on F5
+- Toggle via F5
 
 ### Live Console Menu
 - Renders a real-time ASCII menu in the attached console
