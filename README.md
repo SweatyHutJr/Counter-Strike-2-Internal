@@ -113,29 +113,6 @@ exactly over the game with no manual positioning.
 
 ---
 
-## 1. Build the DLL
-
-  Set the configuration to Release and platform to x64.
-
-  Build the project to produce Guppy Internal.dll.
-      
-  2. Inject with Extreme Injector
-        Manual Map is required. Standard LoadLibrary injection will fail or be
-        detected because the DLL manages its own dependencies and initialization.
-
-  3. Launch CS2 and wait until you reach the main menu.
-
-  4. Run Extreme Injector v3.7.2 as Administrator.
-
-  5. Open Settings and set Injection Method -> Manual Map.
-
-  6. Click OK to save. Click select and choose cs2.exe process, Add DLL and select Guppy Internal.dll
-
-  7. Click Inject.
-
-  A console window should appear immediately with the live menu.
-  
-  Press F11 to unload the cheat.
-
-
+## Download Guppy Internal.dll from Releases
+## Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
 
