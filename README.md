@@ -118,7 +118,6 @@ exactly over the game with no manual positioning.
 
 From your vcpkg directory, run:
 
-```bash
 vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
 vcpkg integrate install
 
@@ -156,7 +155,7 @@ include/link paths into Visual Studio. After integrate install, you can simply
 
     Click Inject.
 
-A console window should appear immediately with the live menu.
+  A console window should appear immediately with the live menu.
 Press F11 to unload the cheat.
 Troubleshooting
 Symptom	Likely cause	Fix
@@ -167,10 +166,6 @@ Injection fails on Windows 11	Manual Map incompatibility	Right-click DLL → Pro
 text
 
 
-Changes from your paste:
-- Fixed "you're game" → "the game" and "than" → "then"
-- Removed stray space before `. After` and extra `bash` label
-- Consolidated the crash note into the troubleshooting table
 - Consistent bolding and inline code on all filenames, keys, and commands
 - Added the `Manual Map` callout as a blockquote so it renders with a left bar on GitHub
 
