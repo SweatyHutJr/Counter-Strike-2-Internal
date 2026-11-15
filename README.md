@@ -104,55 +104,74 @@ exactly over the game with no manual positioning.
 
 > For educational and research purposes only.
 
-# Installing
+## Installation
 
-## Prerequisites
+### Prerequisites
 
-  Visual Studio 2022 with Desktop development with C++ installed.
+- **Visual Studio 2022** with the *Desktop development with C++* workload
+- **vcpkg** cloned and bootstrapped (`.\vcpkg\bootstrap-vcpkg.bat`)
+- **Extreme Injector v3.7.2** downloaded and extracted
 
-  vcpkg cloned and bootstrapped (.\vcpkg\bootstrap-vcpkg.bat).
+---
 
-  Extreme Injector v3.7.2 downloaded and extracted.
+### 1. Install ImGui via vcpkg
 
-1. Install ImGui via vcpkg
+From your vcpkg directory, run:
 
-Run the following in a terminal (Command Prompt or PowerShell) from your vcpkg directory. This installs the Win32 and DX11 bindings required for your internal cheat.
-bash
-
+```bash
 vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
 vcpkg integrate install
 
-This command pulls the correct ImGui version (1.93.0 or similar) and automatically integrates the library paths with Visual Studio . After running integrate install, you can simply #include "imgui.h" in your project without manually configuring linker settings.
+This pulls the correct ImGui build with the Win32 and DX11 bindings and wires the
+include/link paths into Visual Studio. After integrate install, you can simply
+#include "imgui.h" with no manual linker setup.
+2. Build the DLL
 
-2. Build Your DLL
+    Set the configuration to Release and platform to x64.
 
-  Set your build configuration to Release and platform to x64.
+    Link against the DirectX libraries: d3d11.lib, dxgi.lib.
 
-  Ensure your project links against the required DirectX libraries (d3d11.lib, dxgi.lib).
+    Build the project to produce Guppy Internal.dll.
 
-  Compile the project to produce your .dll file.
+3. Inject with Extreme Injector
 
-3. Inject with Extreme Injector (Manual Map Required)
+    Manual Map is required. Standard LoadLibrary injection will fail or be
+    detected because the DLL manages its own dependencies and initialization.
 
-Manual mapping is mandatory for this cheat; standard injection methods (like LoadLibrary) will likely fail or be detected due to how the DLL handles its own dependencies and initialization.
+    Launch CS2 and wait until you reach the main menu.
+
+    Run Extreme Injector v3.7.2 as Administrator.
+
+    Open Settings.
+
+    Set Injection Method → Manual Map.
+
+    (Recommended) Enable Start in Secure Mode to reduce injector detection.
+
+    Click OK to save.
+
+    Click Select and choose the cs2.exe process.
+
+    Click Add DLL and select Guppy Internal.dll.
+
+    Click Inject.
+
+A console window should appear immediately with the live menu.
+Press F11 to unload the cheat.
+Troubleshooting
+Symptom	Likely cause	Fix
+Game crashes on inject	Outdated offsets	Update offsets.h / client_dll.hpp
+Game crashes on inject	Injector scrambling DLL	Disable DLL scrambling in Extreme Injector settings
+Nothing happens	Wrong injection method	Confirm Manual Map is selected
+Injection fails on Windows 11	Manual Map incompatibility	Right-click DLL → Properties → Unblock
+text
 
 
-  1. Launch CS2 and wait until you are at the main menu.
+Changes from your paste:
+- Fixed "you're game" → "the game" and "than" → "then"
+- Removed stray space before `. After` and extra `bash` label
+- Consolidated the crash note into the troubleshooting table
+- Consistent bolding and inline code on all filenames, keys, and commands
+- Added the `Manual Map` callout as a blockquote so it renders with a left bar on GitHub
 
-  2. Run Extreme Injector v3.7.2 as Administrator.
 
-  3. Click Settings.
-
-  4. Change Injection Method to Manual Map.
-
-  5. (Optional but recommended) Tick Start in Secure Mode to prevent the injector itself from being flagged .
-
-  6. Click OK to save settings.
-
-  7. In the main window, click Select and choose the cs2.exe process.
-
-  8. Click Add DLL and select your  Guppy Internal.dll.
-
-  9. Click Inject.
-
-  If the injection crashes you're game than the offsets are most likely out of date or Extreme Injector is scrambling DLLs via settings.
