@@ -7,6 +7,10 @@
   <img src="Guppy Internal/Images/4Github1.png" width="600" alt="Console menu">
 </p>
 
+<p align="center">
+  <img src="Guppy Internal/Images/GuppyMenu.png" width="600" alt="Console menu">
+</p>
+
 # CS2 Internal
 
 A fully-featured internal cheat for Counter-Strike 2, written in C++ and rendered
