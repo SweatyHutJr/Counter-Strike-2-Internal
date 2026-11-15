@@ -92,7 +92,7 @@ exactly over the game with no manual positioning.
 
 ## Notes
 
-- Offsets live in `offsets.h` / `client_dll.hpp` and must be updated after
+- Offsets live in `offsets.h` / `client_dll.hpp` /  `buttons.h` and must be updated after
   CS2 patches.
 - The overlay uses a color-keyed layered window; the render target is cleared
   to `(0,0,0,0)` so only ImGui draw data is visible.
