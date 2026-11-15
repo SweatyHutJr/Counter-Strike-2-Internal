@@ -103,3 +103,52 @@ exactly over the game with no manual positioning.
 - Console menu is ASCII-only so it renders correctly regardless of code page.
 
 > For educational and research purposes only.
+
+# Installing
+
+Prerequisites
+
+    Visual Studio 2022 with Desktop development with C++ installed.
+
+    vcpkg cloned and bootstrapped (.\vcpkg\bootstrap-vcpkg.bat).
+
+    Extreme Injector v3.7.2 downloaded and extracted.
+
+1. Install ImGui via vcpkg
+
+Run the following in a terminal (Command Prompt or PowerShell) from your vcpkg directory. This installs the Win32 and DX11 bindings required for your internal cheat.
+bash
+
+vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
+vcpkg integrate install
+
+This command pulls the correct ImGui version (1.93.0 or similar) and automatically integrates the library paths with Visual Studio . After running integrate install, you can simply #include "imgui.h" in your project without manually configuring linker settings.
+2. Build Your DLL
+
+    Set your build configuration to Release and platform to x64.
+
+    Ensure your project links against the required DirectX libraries (d3d11.lib, dxgi.lib).
+
+    Compile the project to produce your .dll file.
+
+3. Inject with Extreme Injector (Manual Map Required)
+
+Manual mapping is mandatory for this cheat; standard injection methods (like LoadLibrary) will likely fail or be detected due to how the DLL handles its own dependencies and initialization.
+
+    Launch CS2 and wait until you are at the main menu.
+
+    Run Extreme Injector v3.7.2 as Administrator.
+
+    Click Settings.
+
+    Change Injection Method to Manual Map .
+
+    (Optional but recommended) Tick Start in Secure Mode to prevent the injector itself from being flagged .
+
+    Click OK to save settings.
+
+    In the main window, click Select and choose the cs2.exe process.
+
+    Click Add DLL and select your compiled .dll file.
+
+    Click Inject.
