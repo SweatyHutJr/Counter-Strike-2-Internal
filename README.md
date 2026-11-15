@@ -108,8 +108,8 @@ exactly over the game with no manual positioning.
 
 ### Prerequisites
 
-**[Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)** with the *Desktop development with C++* workload
-- **vcpkg** cloned and bootstrapped (`.\vcpkg\bootstrap-vcpkg.bat`)
+- **[Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)** with the *Desktop development with C++* workload
+- **[vcpkg](https://github.com/microsoft/vcpkg)** cloned and bootstrapped (`.\vcpkg\bootstrap-vcpkg.bat`)
 - **[Extreme Injector v3.7.2](https://github.com/master131/ExtremeInjector)** downloaded and extracted
 
 ---
