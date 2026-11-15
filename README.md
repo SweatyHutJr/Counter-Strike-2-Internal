@@ -114,3 +114,4 @@ exactly over the game with no manual positioning.
 ### Download Guppy Internal.dll from Releases
 ### Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
 Do not scramble the DLL as it will likely crash the game. If it crashes while not scrambled than the offsets must be updated
+Windows Defender will likely flag Extreme Injector. You have to make an exception when the notification appears when launching EI, select "allow on device."
