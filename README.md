@@ -117,13 +117,13 @@ exactly over the game with no manual positioning.
 ### 1. Install ImGui via vcpkg
 
 From your vcpkg directory, run:
-
-vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
-vcpkg integrate install
+`vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
+vcpkg integrate install`
 
 This pulls the correct ImGui build with the Win32 and DX11 bindings and wires the
 include/link paths into Visual Studio. After integrate install, you can simply
 #include "imgui.h" with no manual linker setup.
+
 2. Build the DLL
 
   Set the configuration to Release and platform to x64.
