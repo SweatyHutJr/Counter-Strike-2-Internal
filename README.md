@@ -109,21 +109,11 @@ exactly over the game with no manual positioning.
 ### Prerequisites
 
 - **[Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)** with the *Desktop development with C++* workload
-- **[vcpkg](https://github.com/microsoft/vcpkg)** cloned and bootstrapped (`.\vcpkg\bootstrap-vcpkg.bat`)
 - **[Extreme Injector v3.7.2](https://github.com/master131/ExtremeInjector)** downloaded and extracted
 
 ---
 
-### 1. Install ImGui via vcpkg
-
-From your vcpkg directory, run:
-`vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
-vcpkg integrate install`
-
-This pulls the correct ImGui build with the Win32 and DX11 bindings and wires the
-include/link paths into Visual Studio.
-
-2. Build the DLL
+## 1. Build the DLL
 
       Set the configuration to Release and platform to x64.
 
@@ -131,19 +121,19 @@ include/link paths into Visual Studio.
 
       Build the project to produce Guppy Internal.dll.
 
-3. Inject with Extreme Injector
+2. Inject with Extreme Injector
         Manual Map is required. Standard LoadLibrary injection will fail or be
         detected because the DLL manages its own dependencies and initialization.
 
-4. Launch CS2 and wait until you reach the main menu.
+3. Launch CS2 and wait until you reach the main menu.
 
-5. Run Extreme Injector v3.7.2 as Administrator.
+4. Run Extreme Injector v3.7.2 as Administrator.
 
-6. Open Settings and set Injection Method -> Manual Map.
+5. Open Settings and set Injection Method -> Manual Map.
 
-7. Click OK to save. Click select and choose cs2.exe process, Add DLL and select Guppy Internal.dll
+6. Click OK to save. Click select and choose cs2.exe process, Add DLL and select Guppy Internal.dll
 
-8. Click Inject.
+7. Click Inject.
 
   A console window should appear immediately with the live menu.
   
