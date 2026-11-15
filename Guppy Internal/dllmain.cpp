@@ -231,7 +231,7 @@ static bool RunOverlay(HMODULE hModule)
                 draw_list->AddCircle(ImVec2((float)centerX, (float)centerY), radiusInPixels, IM_COL32(200, 100, 255, 255), 0, 1.5f);
             }
 
-            if (settings.espEnabled) {
+            if (settings.espEnabled) { 
                 for (size_t p = 0; p < cachedPawns.size(); p++) {
                     uintptr_t playerController = cachedControllers[p];
                     uintptr_t CSPlayerPawnPtr = cachedPawns[p];
