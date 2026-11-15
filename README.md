@@ -126,47 +126,37 @@ include/link paths into Visual Studio. After integrate install, you can simply
 #include "imgui.h" with no manual linker setup.
 2. Build the DLL
 
-    Set the configuration to Release and platform to x64.
+  Set the configuration to Release and platform to x64.
 
-    Link against the DirectX libraries: d3d11.lib, dxgi.lib.
+  Link against the DirectX libraries: d3d11.lib, dxgi.lib.
 
-    Build the project to produce Guppy Internal.dll.
+  Build the project to produce Guppy Internal.dll.
 
 3. Inject with Extreme Injector
 
     Manual Map is required. Standard LoadLibrary injection will fail or be
     detected because the DLL manages its own dependencies and initialization.
 
-    Launch CS2 and wait until you reach the main menu.
+4. Launch CS2 and wait until you reach the main menu.
 
-    Run Extreme Injector v3.7.2 as Administrator.
+5. Run Extreme Injector v3.7.2 as Administrator.
 
-    Open Settings.
+6. Open Settings and set Injection Method -> Manual Map.
 
-    Set Injection Method → Manual Map.
+7. Click OK to save. Click select and choose cs2.exe process, Add DLL and select Guppy Internal.dll
 
-    (Recommended) Enable Start in Secure Mode to reduce injector detection.
-
-    Click OK to save.
-
-    Click Select and choose the cs2.exe process.
-
-    Click Add DLL and select Guppy Internal.dll.
-
-    Click Inject.
+8.  lick Inject.
 
   A console window should appear immediately with the live menu.
-Press F11 to unload the cheat.
-Troubleshooting
-Symptom	Likely cause	Fix
-Game crashes on inject	Outdated offsets	Update offsets.h / client_dll.hpp
-Game crashes on inject	Injector scrambling DLL	Disable DLL scrambling in Extreme Injector settings
-Nothing happens	Wrong injection method	Confirm Manual Map is selected
-Injection fails on Windows 11	Manual Map incompatibility	Right-click DLL → Properties → Unblock
-text
+  Press F11 to unload the cheat.
+## Troubleshooting
+Symptom	                                Likely cause	                            Fix
+Game crashes on inject	              Outdated offsets	            Update offsets.h / client_dll.hpp
+Game crashes on inject	          Injector scrambling DLL        	  Disable DLL scrambling in Extreme Injector settings
+Nothing happens	                    Wrong injection method	          Confirm Manual Map is selected
+Injection fails on Windows 11	    Manual Map incompatibility	    Right-click DLL → Properties → Unblock
 
 
-- Consistent bolding and inline code on all filenames, keys, and commands
-- Added the `Manual Map` callout as a blockquote so it renders with a left bar on GitHub
+
 
 
