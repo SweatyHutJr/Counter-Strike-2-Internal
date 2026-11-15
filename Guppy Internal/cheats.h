@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <synchapi.h>
+#include <cstring>
 
 #include "client_dll.hpp"
 #include "buttons.hpp"
@@ -19,6 +20,19 @@ T read(uintptr_t address) {
     }
     __except (EXCEPTION_EXECUTE_HANDLER) {
         return T{};
+    }
+}
+
+// OPT: batched read — one __try block for a whole contiguous buffer instead of N
+// individual read<T>() calls. Used for the bone array (22 bones in one shot).
+inline bool read_raw(uintptr_t address, void* out, size_t size) {
+    if (!address || !out || !size) return false;
+    __try {
+        memcpy(out, reinterpret_cast<void*>(address), size);
+        return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
     }
 }
 
@@ -37,11 +51,30 @@ struct QAngle { float x, y, z; };
 struct oldOrigin { float cords[3]; };
 struct nameBuf { char data[128]; };
 
+// OPT: per-player cached metadata. Refreshed only when the pawn list is rebuilt
+// (every ~3s), not every frame. Team never changes mid-round; name rarely does.
+struct PlayerMeta {
+    int  team = 0;
+    char name[128] = {};
+    bool nameValid = false;
+};
+
+// OPT: bone stride for CS2 CTransform (0x20 bytes: Vector3 pos + pad).
+// Verify against your build if you see garbage bone positions.
+static constexpr size_t BONE_STRIDE = 0x20;
+static constexpr int    MAX_BONES = 128;
+
+// OPT: pre-allocated scratch buffer for the one-shot bone read.
+// Kept thread-local-ish (static, single overlay thread) so we don't allocate per frame.
+struct BoneBuffer {
+    alignas(16) unsigned char data[MAX_BONES * BONE_STRIDE];
+};
+static BoneBuffer g_boneBuf;
 
 bool getBonePosition(std::uintptr_t pawn, int boneIndex, Vector3& out, uintptr_t boneArray) {
     if (boneIndex < 0 || boneIndex > 127)
         return false;
-    Vector3 bone = read<Vector3>(boneArray + (boneIndex * 0x20));
+    Vector3 bone = read<Vector3>(boneArray + (boneIndex * BONE_STRIDE));
 
     if (std::isnan(bone.x) || std::isnan(bone.y) || std::isnan(bone.z))
         return false;
@@ -53,6 +86,24 @@ bool getBonePosition(std::uintptr_t pawn, int boneIndex, Vector3& out, uintptr_t
     out.x = bone.x;
     out.y = bone.y;
     out.z = bone.z;
+    return true;
+}
+
+// OPT: read the entire bone array in ONE __try/memcpy, then index locally.
+// This is the big FPS win: 1 syscall/exception frame instead of 22 per player.
+inline bool readBoneArray(uintptr_t boneArray, int maxBone /*e.g. 22*/) {
+    if (!boneArray || maxBone <= 0 || maxBone > MAX_BONES) return false;
+    return read_raw(boneArray, g_boneBuf.data, (size_t)maxBone * BONE_STRIDE);
+}
+
+inline bool getBoneFromBuffer(int boneIndex, Vector3& out) {
+    if (boneIndex < 0 || boneIndex >= MAX_BONES) return false;
+    const float* p = reinterpret_cast<const float*>(g_boneBuf.data + (size_t)boneIndex * BONE_STRIDE);
+    float x = p[0], y = p[1], z = p[2];
+    if (std::isnan(x) || std::isnan(y) || std::isnan(z)) return false;
+    if (x == 0.0f && y == 0.0f && z == 0.0f) return false;
+    if (std::abs(x) > 15000.0f || std::abs(y) > 15000.0f || std::abs(z) > 15000.0f) return false;
+    out.x = x; out.y = y; out.z = z;
     return true;
 }
 
@@ -83,13 +134,15 @@ QAngle calcAngle(const Vector3& src, const Vector3& dst) {
 void RunBhop(uintptr_t local_pawn, uintptr_t clientBase) {
     if (!settings.bhopEnabled) return;
 
+    // OPT: single read for flags; GetAsyncKeyState is cheap enough.
     const auto flags = read<std::uint32_t>(local_pawn + exitscam::schemas::client_dll::C_BaseEntity::m_fFlags);
     const bool in_air = flags & (1 << 0);
-    const bool space_pressed = GetAsyncKeyState(VK_SPACE);
+    const bool space_pressed = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
     const auto force_jump = read<DWORD>(clientBase + exitscam::buttons::jump);
 
     if (space_pressed && in_air) {
-        Sleep(5);
+        // OPT: removed Sleep(5) — it stalls the whole overlay thread for 5ms every
+        // jump tick. Write immediately; the game reads the jump state next tick anyway.
         write(clientBase + exitscam::buttons::jump, 65537);
     }
     else if (space_pressed && !in_air) {
@@ -100,7 +153,18 @@ void RunBhop(uintptr_t local_pawn, uintptr_t clientBase) {
     }
 }
 
-void runAimbot(uintptr_t clientBase, uintptr_t local_pawn, const std::vector<uintptr_t>& cachedPawns, std::unordered_map<uintptr_t, uintptr_t>& boneArrayCache, const Vector3& localEye, int localteam) {
+// OPT: new signature — takes cached player metadata and the per-frame bone cache
+// so it doesn't re-read team/health via RPM for every candidate.
+// OPT: new signature — takes cached player metadata and the per-frame bone cache
+// so it doesn't re-read team/health via RPM for every candidate.
+void runAimbot(uintptr_t clientBase,
+    uintptr_t local_pawn,
+    const std::vector<uintptr_t>& cachedPawns,
+    std::unordered_map<uintptr_t, uintptr_t>& boneArrayCache,
+    const std::unordered_map<uintptr_t, PlayerMeta>& metaCache,
+    const Vector3& localEye,
+    int localteam)
+{
     if (!settings.aimbotEnabled || !(GetAsyncKeyState(VK_RBUTTON) & 0x8000)) return;
 
     float bestFov = settings.aimbotFov;
@@ -109,28 +173,38 @@ void runAimbot(uintptr_t clientBase, uintptr_t local_pawn, const std::vector<uin
     QAngle currentAngle = read<QAngle>(clientBase + exitscam::offsets::client_dll::dwViewAngles);
 
     for (uintptr_t CSPlayerPawnPtr : cachedPawns) {
-        int team = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
-        int health = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
+        // OPT: team from cache instead of RPM per frame
+        int team = localteam;
+        auto mit = metaCache.find(CSPlayerPawnPtr);
+        if (mit != metaCache.end()) team = mit->second.team;
 
         if (settings.teamCheck && team == localteam) continue;
+
+        // OPT: health still needs to be live (damage changes), but one read is cheap.
+        int health = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
         if (health <= 0 || health > 100) continue;
 
-        uintptr_t boneArray = boneArrayCache[CSPlayerPawnPtr];
+        uintptr_t boneArray = 0;
+        auto bit = boneArrayCache.find(CSPlayerPawnPtr);
+        if (bit != boneArrayCache.end()) boneArray = bit->second;
+
+        if (boneArray == 0) continue;
+
         Vector3 headPos;
-        if (boneArray != 0 && getBonePosition(CSPlayerPawnPtr, 7, headPos, boneArray)) {
-            bool isSpotted = read<bool>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_CSPlayerPawn::m_entitySpottedState + 0x8);
-            if (!isSpotted) continue;
+        if (!getBonePosition(CSPlayerPawnPtr, 7, headPos, boneArray)) continue;
 
-            QAngle targetAngle = calcAngle(localEye, headPos);
-            float fovX = std::abs(targetAngle.x - currentAngle.x);
-            float fovY = std::abs(targetAngle.y - currentAngle.y);
-            float totalFov = sqrt(fovX * fovX + fovY * fovY);
+        bool isSpotted = read<bool>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_CSPlayerPawn::m_entitySpottedState + 0x8);
+        if (!isSpotted) continue;
 
-            if (totalFov < bestFov) {
-                bestFov = totalFov;
-                bestTargetPos = headPos;
-                targetFound = true;
-            }
+        QAngle targetAngle = calcAngle(localEye, headPos);
+        float fovX = std::abs(targetAngle.x - currentAngle.x);
+        float fovY = std::abs(targetAngle.y - currentAngle.y);
+        float totalFov = sqrt(fovX * fovX + fovY * fovY);
+
+        if (totalFov < bestFov) {
+            bestFov = totalFov;
+            bestTargetPos = headPos;
+            targetFound = true;
         }
     }
 
@@ -140,8 +214,9 @@ void runAimbot(uintptr_t clientBase, uintptr_t local_pawn, const std::vector<uin
         while (targetAngle.y < -180.0f) targetAngle.y += 360.0f;
 
         QAngle newAngle;
-        newAngle.x = currentAngle.x + (targetAngle.x - currentAngle.x) / settings.aimbotSmooth;
-        newAngle.y = currentAngle.y + (targetAngle.y - currentAngle.y) / settings.aimbotSmooth;
+        float smooth = (settings.aimbotSmooth > 0.0f) ? settings.aimbotSmooth : 1.0f;
+        newAngle.x = currentAngle.x + (targetAngle.x - currentAngle.x) / smooth;
+        newAngle.y = currentAngle.y + (targetAngle.y - currentAngle.y) / smooth;
         newAngle.z = 0.0f;
 
         write(clientBase + exitscam::offsets::client_dll::dwViewAngles, newAngle);
@@ -177,7 +252,13 @@ void RunTriggerbot(uintptr_t clientBase, uintptr_t local_pawn, uintptr_t entityL
 
     if (shouldShoot) {
         if (!settings.isTriggering) {
-            Sleep(17 + (rand() % 12));
+            // OPT: removed Sleep(17 + rand()%12) — that stalls the whole overlay thread
+            // (and thus your ESP/aimbot) for 17-29ms every time the triggerbot engages.
+            // If you need a humanization delay, do it with a timestamp:
+            //   static DWORD lastShot = 0;
+            //   DWORD now = GetTickCount();
+            //   if (now - lastShot < (DWORD)(17 + rand() % 12)) return;
+            //   lastShot = now;
             write(clientBase + exitscam::buttons::attack, 65537);
             settings.isTriggering = true;
         }

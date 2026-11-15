@@ -1,5 +1,7 @@
 #include <iostream>
 #include <array>    
+#include <cstdio>
+#include <string>
 #include "buttons.hpp"
 #include "client_dll.hpp"
 #include "offsets.h"
@@ -8,57 +10,49 @@
 #include "DX11ImGui.h"
 
 std::vector<UINT> g_LoggedIndexCounts;
+static volatile bool running = true;
+static FILE* consoleFile = nullptr;
+static HWND hwndOverlay = nullptr;
+static bool classRegistered = false;
 
-
-
-DWORD WINAPI MainThread(HMODULE hModule)
+static bool RunOverlay(HMODULE hModule)
 {
     AllocConsole();
-    FILE* f;
-    freopen_s(&f, "CONOUT$", "w", stdout);
-    printf("Console created\n");
+    freopen_s(&consoleFile, "CONOUT$", "w", stdout);
+    { CONSOLE_CURSOR_INFO ci{ sizeof(ci), FALSE }; SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &ci); }
 
     uintptr_t clientBase = 0;
     while (!(clientBase = reinterpret_cast<uintptr_t>(GetModuleHandleA("client.dll")))) {
+        if (!running) return false;
         Sleep(100);
     }
 
     HWND hwnd = NULL;
-    printf("Waiting for CS2 window...\n");
-
     while (!hwnd) {
+        if (!running) return false;
         EnumWindows([](HWND hWnd, LPARAM lParam) -> BOOL {
             DWORD processId = 0;
             GetWindowThreadProcessId(hWnd, &processId);
-
-            if (processId == GetCurrentProcessId()) {
-                if (IsWindowVisible(hWnd)) {
-                    RECT rect;
-                    GetClientRect(hWnd, &rect);
-                    if (rect.right > 100 && rect.bottom > 100) {
-                        char className[256];
-                        GetClassNameA(hWnd, className, 256);
-                        if (strcmp(className, "ConsoleWindowClass") != 0) {
-                            *(HWND*)lParam = hWnd;
-                            return FALSE;
-                        }
-                    }
-                }
+            if (processId != GetCurrentProcessId()) return TRUE;
+            if (!IsWindowVisible(hWnd)) return TRUE;
+            RECT rect;
+            GetClientRect(hWnd, &rect);
+            if (rect.right <= 100 || rect.bottom <= 100) return TRUE;
+            char className[256];
+            GetClassNameA(hWnd, className, 256);
+            if (strcmp(className, "ConsoleWindowClass") != 0) {
+                *(HWND*)lParam = hWnd;
+                return FALSE;
             }
             return TRUE;
             }, (LPARAM)&hwnd);
-
-        if (!hwnd) {
-            Sleep(500);
-        }
+        if (!hwnd) Sleep(500);
     }
-
-    printf("CS2 window found!\n");
 
     RECT cr;
     GetClientRect(hwnd, &cr);
-
     while (cr.right <= 0 || cr.bottom <= 0) {
+        if (!running) return false;
         Sleep(500);
         GetClientRect(hwnd, &cr);
     }
@@ -70,50 +64,43 @@ DWORD WINAPI MainThread(HMODULE hModule)
     wc.lpfnWndProc = WndProc;
     wc.hInstance = GetModuleHandle(nullptr);
     wc.lpszClassName = L"DiscordOverlay";
-    RegisterClassEx(&wc);
+    if (!RegisterClassEx(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+        printf("RegisterClassEx failed: %lu\n", GetLastError());
+        return false;
+    }
+    classRegistered = true;
 
-    HWND hwndOverlay = CreateWindowEx(
+    hwndOverlay = CreateWindowEx(
         WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         wc.lpszClassName, L"", WS_POPUP, tl.x, tl.y, cr.right, cr.bottom,
         nullptr, nullptr, wc.hInstance, nullptr);
-
     if (!hwndOverlay) {
         printf("Failed to create overlay window! Error: %d\n", GetLastError());
-        FreeConsole();
-        return 0;
+        return false;
     }
 
     SetLayeredWindowAttributes(hwndOverlay, RGB(0, 0, 0), 0, LWA_COLORKEY);
-
     ShowWindow(hwndOverlay, SW_SHOW);
     UpdateWindow(hwndOverlay);
 
     bool dxInitialized = false;
     for (int attempt = 0; attempt < 20; attempt++) {
+        if (!running) return false;
         MSG initMsg;
         while (PeekMessage(&initMsg, hwndOverlay, 0, 0, PM_REMOVE)) {
             TranslateMessage(&initMsg);
             DispatchMessage(&initMsg);
         }
-
-        if (CreateDeviceD3D(hwndOverlay)) {
-            dxInitialized = true;
-            break;
-        }
-
+        if (CreateDeviceD3D(hwndOverlay)) { dxInitialized = true; break; }
         printf("DX11 attempt %d failed.\n", attempt + 1);
         Sleep(250);
     }
-
     if (!dxInitialized) {
         printf("DX11 Init Failed after 20 attempts. Aborting.\n");
-        DestroyWindow(hwndOverlay);
-        FreeConsole();
-        return 0;
+        return false;
     }
 
     InitImGui(hwndOverlay);
-    printf("ImGui initialized.\n");
 
     const auto entityList = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwEntityList);
     const auto viewMatrixPtr = clientBase + exitscam::offsets::client_dll::dwViewMatrix;
@@ -122,19 +109,22 @@ DWORD WINAPI MainThread(HMODULE hModule)
     ZeroMemory(&msg, sizeof(msg));
 
     std::unordered_map<uintptr_t, uintptr_t> boneArrayCache;
+    std::unordered_map<uintptr_t, PlayerMeta> metaCache;
     std::vector<uintptr_t> cachedControllers;
     std::vector<uintptr_t> cachedPawns;
-    DWORD lastCacheTime = 0;
 
-    while (msg.message != WM_QUIT)
+    ULONGLONG lastCacheTime = 0;
+    RECT lastGameRect = {};
+    POINT lastGameTl = {};
+
+    while (running && msg.message != WM_QUIT)
     {
         if (!g_LoggedIndexCounts.empty()) {
             printf("Logged IndexCounts > 3000:\n");
-            for (UINT val : g_LoggedIndexCounts) {
-                printf("- %u\n", val);
-            }
+            for (UINT val : g_LoggedIndexCounts) printf("- %u\n", val);
             g_LoggedIndexCounts.clear();
         }
+
         if (PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
@@ -148,7 +138,13 @@ DWORD WINAPI MainThread(HMODULE hModule)
         GetClientRect(hwnd, &gameRect);
         POINT gameTl = { 0, 0 };
         ClientToScreen(hwnd, &gameTl);
-        SetWindowPos(hwndOverlay, HWND_TOPMOST, gameTl.x, gameTl.y, gameRect.right, gameRect.bottom, SWP_NOACTIVATE);
+
+        if (memcmp(&gameRect, &lastGameRect, sizeof(RECT)) != 0 ||
+            memcmp(&gameTl, &lastGameTl, sizeof(POINT)) != 0) {
+            SetWindowPos(hwndOverlay, HWND_TOPMOST, gameTl.x, gameTl.y, gameRect.right, gameRect.bottom, SWP_NOACTIVATE);
+            lastGameRect = gameRect;
+            lastGameTl = gameTl;
+        }
 
         if (GetForegroundWindow() != hwnd) { Sleep(50); continue; }
 
@@ -188,7 +184,6 @@ DWORD WINAPI MainThread(HMODULE hModule)
             if (listEntry && (GetTickCount64() - lastCacheTime > 3000 || cachedControllers.empty())) {
                 cachedControllers.clear();
                 cachedPawns.clear();
-                boneArrayCache.clear();
 
                 for (int i = 1; i < 64; i++) {
                     uintptr_t playerController = read<uintptr_t>(listEntry + i * 0x70);
@@ -205,7 +200,26 @@ DWORD WINAPI MainThread(HMODULE hModule)
 
                     cachedControllers.push_back(playerController);
                     cachedPawns.push_back(CSPlayerPawnPtr);
+
+                    PlayerMeta meta;
+                    meta.team = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
+                    nameBuf nbTmp = read<nameBuf>(playerController + exitscam::schemas::client_dll::CBasePlayerController::m_iszPlayerName);
+                    memcpy(meta.name, nbTmp.data, sizeof(meta.name));
+                    meta.nameValid = true;
+                    metaCache[CSPlayerPawnPtr] = meta;
                 }
+
+                for (auto it2 = boneArrayCache.begin(); it2 != boneArrayCache.end(); ) {
+                    if (std::find(cachedPawns.begin(), cachedPawns.end(), it2->first) == cachedPawns.end())
+                        it2 = boneArrayCache.erase(it2);
+                    else ++it2;
+                }
+                for (auto it2 = metaCache.begin(); it2 != metaCache.end(); ) {
+                    if (std::find(cachedPawns.begin(), cachedPawns.end(), it2->first) == cachedPawns.end())
+                        it2 = metaCache.erase(it2);
+                    else ++it2;
+                }
+
                 lastCacheTime = GetTickCount64();
             }
 
@@ -226,7 +240,9 @@ DWORD WINAPI MainThread(HMODULE hModule)
 
                     oldOrigin player = read<oldOrigin>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
                     int health = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
-                    int team = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
+                    int team = 0;
+                    auto mIt = metaCache.find(CSPlayerPawnPtr);
+                    if (mIt != metaCache.end()) team = mIt->second.team;
                     if (settings.teamCheck && team == localTeam) continue;
                     if (!health || health > 100) continue;
 
@@ -268,8 +284,10 @@ DWORD WINAPI MainThread(HMODULE hModule)
                             }
                         }
 
-                        nameBuf nb = read<nameBuf>(playerController + exitscam::schemas::client_dll::CBasePlayerController::m_iszPlayerName);
-                        draw_list->AddText(ImVec2((float)head.x - (ImGui::CalcTextSize(nb.data).x / 2), (float)topY - 18), IM_COL32(200, 100, 255, 255), nb.data);
+                        const char* nameStr = "";
+                        if (mIt != metaCache.end() && mIt->second.nameValid)
+                            nameStr = mIt->second.name;
+                        draw_list->AddText(ImVec2((float)head.x - (ImGui::CalcTextSize(nameStr).x / 2), (float)topY - 18), IM_COL32(200, 100, 255, 255), nameStr);
 
                         char distStr[32];
                         sprintf_s(distStr, "%dm", distance);
@@ -301,12 +319,14 @@ DWORD WINAPI MainThread(HMODULE hModule)
                             Vector2 screenBones[23];
                             bool valid[23] = { false };
 
-                            for (int i = 1; i <= 22; i++) {
-                                Vector3 bonePos;
-                                if (getBonePosition(CSPlayerPawnPtr, i, bonePos, boneArray)) {
-                                    if (worldToScreen(bonePos, screenBones[i], viewMatrix.data(), rect.right, rect.bottom)) {
-                                        if (screenBones[i].x >= 0 && screenBones[i].x <= rect.right && screenBones[i].y >= 0 && screenBones[i].y <= rect.bottom) {
-                                            valid[i] = true;
+                            if (readBoneArray(boneArray, 22)) {
+                                for (int i = 1; i <= 22; i++) {
+                                    Vector3 bonePos;
+                                    if (getBoneFromBuffer(i, bonePos)) {
+                                        if (worldToScreen(bonePos, screenBones[i], viewMatrix.data(), rect.right, rect.bottom)) {
+                                            if (screenBones[i].x >= 0 && screenBones[i].x <= rect.right && screenBones[i].y >= 0 && screenBones[i].y <= rect.bottom) {
+                                                valid[i] = true;
+                                            }
                                         }
                                     }
                                 }
@@ -328,7 +348,7 @@ DWORD WINAPI MainThread(HMODULE hModule)
                 }
             }
 
-            runAimbot(clientBase, local_player_pawn, cachedPawns, boneArrayCache, localEye, localTeam);
+            runAimbot(clientBase, local_player_pawn, cachedPawns, boneArrayCache, metaCache, localEye, localTeam);
             RunTriggerbot(clientBase, local_player_pawn, entityList, localTeam, localHealth);
         }
 
@@ -344,8 +364,16 @@ DWORD WINAPI MainThread(HMODULE hModule)
             break;
         }
 
-        Sleep(30);
+        renderMenu();
+        Sleep(8);
     }
+
+    return true;
+}
+
+DWORD WINAPI MainThread(HMODULE hModule)
+{
+    RunOverlay(hModule);
 
     if (ImGui::GetCurrentContext()) {
         ImGui_ImplDX11_Shutdown();
@@ -354,12 +382,21 @@ DWORD WINAPI MainThread(HMODULE hModule)
     }
 
     if (mainRenderTargetView) { mainRenderTargetView->Release(); mainRenderTargetView = nullptr; }
-    if (swapChain) { swapChain->Release();           swapChain = nullptr; }
-    if (pd3dDeviceContext) { pd3dDeviceContext->Release();   pd3dDeviceContext = nullptr; }
-    if (pd3dDevice) { pd3dDevice->Release();          pd3dDevice = nullptr; }
+    if (swapChain) { swapChain->Release(); swapChain = nullptr; }
+    if (pd3dDeviceContext) { pd3dDeviceContext->Release(); pd3dDeviceContext = nullptr; }
+    if (pd3dDevice) { pd3dDevice->Release(); pd3dDevice = nullptr; }
 
-    DestroyWindow(hwndOverlay);
+    if (hwndOverlay && IsWindow(hwndOverlay)) DestroyWindow(hwndOverlay);
+    hwndOverlay = nullptr;
+
+    if (classRegistered) {
+        UnregisterClass(L"DiscordOverlay", GetModuleHandle(nullptr));
+        classRegistered = false;
+    }
+
+    if (consoleFile) { fclose(consoleFile); consoleFile = nullptr; }
     FreeConsole();
+
     FreeLibraryAndExitThread(hModule, 0);
     return 0;
 }
@@ -374,6 +411,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         }
         break;
     case DLL_PROCESS_DETACH:
+        running = false;
         break;
     }
     return TRUE;
