@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Images/4Github2.png" width="600" alt="Console menu">
+  <img src="Guppy Internal/Images/4Github2.png" width="600" alt="Console menu">
 </p>
 
 
