@@ -148,6 +148,7 @@ include/link paths into Visual Studio. After integrate install, you can simply
 8.  lick Inject.
 
   A console window should appear immediately with the live menu.
+  
   Press F11 to unload the cheat.
 
 
