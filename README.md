@@ -115,12 +115,12 @@ exactly over the game with no manual positioning.
 
 ## 1. Build the DLL
 
-      Set the configuration to Release and platform to x64.
+  Set the configuration to Release and platform to x64.
 
-      Link against the DirectX libraries: d3d11.lib, dxgi.lib.
+  Link against the DirectX libraries: d3d11.lib, dxgi.lib.
 
-      Build the project to produce Guppy Internal.dll.
-
+  Build the project to produce Guppy Internal.dll.
+      
 2. Inject with Extreme Injector
         Manual Map is required. Standard LoadLibrary injection will fail or be
         detected because the DLL manages its own dependencies and initialization.
