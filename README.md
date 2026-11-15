@@ -107,12 +107,10 @@ exactly over the game with no manual positioning.
 ## Installation
 
 ### Prerequisites
-
-- **[Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)** with the *Desktop development with C++* workload
 - **[Extreme Injector v3.7.2](https://github.com/master131/ExtremeInjector)** downloaded and extracted
 
 ---
 
-## Download Guppy Internal.dll from Releases
-## Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
+### Download Guppy Internal.dll from Releases
+### Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
 
