@@ -149,14 +149,6 @@ include/link paths into Visual Studio. After integrate install, you can simply
 
   A console window should appear immediately with the live menu.
   Press F11 to unload the cheat.
-## Troubleshooting
-`Symptom	                                Likely cause	                            Fix
-Game crashes on inject	              Outdated offsets	            Update offsets.h / client_dll.hpp
-Game crashes on inject	          Injector scrambling DLL        	  Disable DLL scrambling in Extreme Injector settings
-Nothing happens	                    Wrong injection method	          Confirm Manual Map is selected
-Injection fails on Windows 11	    Manual Map incompatibility	    Right-click DLL → Properties → Unblock`
-
-
 
 
 
