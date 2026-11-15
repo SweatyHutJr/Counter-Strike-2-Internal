@@ -121,8 +121,7 @@ From your vcpkg directory, run:
 vcpkg integrate install`
 
 This pulls the correct ImGui build with the Win32 and DX11 bindings and wires the
-include/link paths into Visual Studio. After integrate install, you can simply
-#include "imgui.h" with no manual linker setup.
+include/link paths into Visual Studio.
 
 2. Build the DLL
 
