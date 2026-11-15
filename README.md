@@ -143,7 +143,7 @@ include/link paths into Visual Studio.
 
 7. Click OK to save. Click select and choose cs2.exe process, Add DLL and select Guppy Internal.dll
 
-8.  lick Inject.
+8. Click Inject.
 
   A console window should appear immediately with the live menu.
   
