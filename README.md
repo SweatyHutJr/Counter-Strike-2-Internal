@@ -132,9 +132,8 @@ include/link paths into Visual Studio.
       Build the project to produce Guppy Internal.dll.
 
 3. Inject with Extreme Injector
-
-      Manual Map is required. Standard LoadLibrary injection will fail or be
-      detected because the DLL manages its own dependencies and initialization.
+        Manual Map is required. Standard LoadLibrary injection will fail or be
+        detected because the DLL manages its own dependencies and initialization.
 
 4. Launch CS2 and wait until you reach the main menu.
 
