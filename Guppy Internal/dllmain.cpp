@@ -102,12 +102,12 @@ static bool RunOverlay(HMODULE hModule)
 
     InitImGui(hwndOverlay);
 
-    const auto entityList = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwEntityList);
-    const auto viewMatrixPtr = clientBase + exitscam::offsets::client_dll::dwViewMatrix;
-
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
 
+    const auto entityList = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwEntityList);
+    const auto viewMatrixPtr = clientBase + exitscam::offsets::client_dll::dwViewMatrix;
+    const auto local_player_pawn = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwLocalPlayerPawn);
     std::unordered_map<uintptr_t, uintptr_t> boneArrayCache;
     std::unordered_map<uintptr_t, PlayerMeta> metaCache;
     std::vector<uintptr_t> cachedControllers;
@@ -170,7 +170,6 @@ static bool RunOverlay(HMODULE hModule)
 
         handleInputs();
 
-        const auto local_player_pawn = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwLocalPlayerPawn);
 
         if (local_player_pawn != 0) {
             std::array<float, 16> viewMatrix = read<std::array<float, 16>>(viewMatrixPtr);

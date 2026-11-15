@@ -2,9 +2,9 @@
 #include <d3d11.h>
 #include <dxgi.h>
 #include <d3dcompiler.h>
-#include "imgui.h"
-#include "backends/imgui_impl_win32.h"
-#include "backends/imgui_impl_dx11.h"
+#include "ImGUI/imgui.h"
+#include "ImGUI/backends/imgui_impl_win32.h"
+#include "ImGui/backends/imgui_impl_dx11.h"
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
