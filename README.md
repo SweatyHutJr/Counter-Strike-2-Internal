@@ -106,7 +106,7 @@ exactly over the game with no manual positioning.
 
 # Installing
 
-Prerequisites
+## Prerequisites
 
   Visual Studio 2022 with Desktop development with C++ installed.
 
@@ -123,6 +123,7 @@ vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
 vcpkg integrate install
 
 This command pulls the correct ImGui version (1.93.0 or similar) and automatically integrates the library paths with Visual Studio . After running integrate install, you can simply #include "imgui.h" in your project without manually configuring linker settings.
+
 2. Build Your DLL
 
   Set your build configuration to Release and platform to x64.
@@ -135,20 +136,23 @@ This command pulls the correct ImGui version (1.93.0 or similar) and automatical
 
 Manual mapping is mandatory for this cheat; standard injection methods (like LoadLibrary) will likely fail or be detected due to how the DLL handles its own dependencies and initialization.
 
-  Launch CS2 and wait until you are at the main menu.
 
-  Run Extreme Injector v3.7.2 as Administrator.
+  1. Launch CS2 and wait until you are at the main menu.
 
-  Click Settings.
+  2. Run Extreme Injector v3.7.2 as Administrator.
 
-  Change Injection Method to Manual Map.
+  3. Click Settings.
 
-  (Optional but recommended) Tick Start in Secure Mode to prevent the injector itself from being flagged .
+  4. Change Injection Method to Manual Map.
 
-  Click OK to save settings.
+  5. (Optional but recommended) Tick Start in Secure Mode to prevent the injector itself from being flagged .
 
-  In the main window, click Select and choose the cs2.exe process.
+  6. Click OK to save settings.
 
-  Click Add DLL and select your  Guppy Internal.dll.
+  7. In the main window, click Select and choose the cs2.exe process.
 
-  Click Inject.
+  8. Click Add DLL and select your  Guppy Internal.dll.
+
+  9. Click Inject.
+
+  If the injection crashes you're game than the offsets are most likely out of date or Extreme Injector is scrambling DLLs via settings.
