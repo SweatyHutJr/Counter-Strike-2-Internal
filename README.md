@@ -35,6 +35,7 @@ exactly over the game with no manual positioning.
 - Hold **RMB** to activate
 - Targets nearest player to crosshair within FOV
 - Uses cached bone positions for aim point
+- Only works if the player is spotted by another player, preventing locking on through walls
 
 ### Triggerbot
 - Auto-fires when crosshair is on an enemy
