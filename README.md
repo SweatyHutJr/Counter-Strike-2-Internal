@@ -122,6 +122,7 @@ Do not scramble the DLL as it will likely crash the game. If it crashes while no
 Windows Defender will likely flag Extreme Injector. You have to make an exception when the notification appears when launching Extreme Injector, select "allow on device." If Windows Defender is still removing the file then turn off real-time protection.
 
 # Adding soon
+Option to only use Bone or Box ESP exclusively
 Spinbot
 Anti-aim
 Chams
