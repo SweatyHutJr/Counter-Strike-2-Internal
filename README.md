@@ -114,6 +114,9 @@ exactly over the game with no manual positioning.
 
 - Download Guppy Internal.dll from Releases
 - Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
+- Make sure game is in windowed fullscreen or windowed. 
+- If ESP does't automatically appear, F11 then inject once in game.
+
 
 Do not scramble the DLL as it will likely crash the game. If it crashes while not scrambled then the offsets must be updated.
 Windows Defender will likely flag Extreme Injector. You have to make an exception when the notification appears when launching Extreme Injector, select "allow on device." If Windows Defender is still removing the file then turn off real-time protection.
