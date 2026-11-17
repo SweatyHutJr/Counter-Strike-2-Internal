@@ -114,8 +114,8 @@ exactly over the game with no manual positioning.
 
 - Download Guppy Internal.dll from Releases
 - Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
-- Make sure game is in windowed fullscreen or windowed. 
-- If ESP does't automatically appear, F11 then inject once in game.
+- Make sure game is in windowed fullscreen or windowed
+- If ESP does't automatically appear, press F11 to unload then inject once in game
 
 
 Do not scramble the DLL as it will likely crash the game. If it crashes while not scrambled then the offsets must be updated.
