@@ -120,3 +120,9 @@ exactly over the game with no manual positioning.
 
 Do not scramble the DLL as it will likely crash the game. If it crashes while not scrambled then the offsets must be updated.
 Windows Defender will likely flag Extreme Injector. You have to make an exception when the notification appears when launching Extreme Injector, select "allow on device." If Windows Defender is still removing the file then turn off real-time protection.
+
+# Adding soon
+Spinbot
+Anti-aim
+Chams
+Interactive ImGUI menu
