@@ -35,6 +35,7 @@ exactly over the game with no manual positioning.
 - Hold **RMB** to activate
 - Targets nearest player to crosshair within FOV
 - Uses cached bone positions for aim point
+- Only works if the player is spotted by another player, preventing locking on through walls
 
 ### Triggerbot
 - Auto-fires when crosshair is on an enemy
@@ -107,47 +108,22 @@ exactly over the game with no manual positioning.
 ## Installation
 
 ### Prerequisites
-
-- **[Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)** with the *Desktop development with C++* workload
-- **[vcpkg](https://github.com/microsoft/vcpkg)** cloned and bootstrapped (`.\vcpkg\bootstrap-vcpkg.bat`)
 - **[Extreme Injector v3.7.2](https://github.com/master131/ExtremeInjector)** downloaded and extracted
 
 ---
 
-### 1. Install ImGui via vcpkg
-
-From your vcpkg directory, run:
-`vcpkg install imgui[win32-binding,dx11-binding]:x64-windows
-vcpkg integrate install`
-
-This pulls the correct ImGui build with the Win32 and DX11 bindings and wires the
-include/link paths into Visual Studio.
-
-2. Build the DLL
-
-      Set the configuration to Release and platform to x64.
-
-      Link against the DirectX libraries: d3d11.lib, dxgi.lib.
-
-      Build the project to produce Guppy Internal.dll.
-
-3. Inject with Extreme Injector
-        Manual Map is required. Standard LoadLibrary injection will fail or be
-        detected because the DLL manages its own dependencies and initialization.
-
-4. Launch CS2 and wait until you reach the main menu.
-
-5. Run Extreme Injector v3.7.2 as Administrator.
-
-6. Open Settings and set Injection Method -> Manual Map.
-
-7. Click OK to save. Click select and choose cs2.exe process, Add DLL and select Guppy Internal.dll
-
-8. Click Inject.
-
-  A console window should appear immediately with the live menu.
-  
-  Press F11 to unload the cheat.
+- Download Guppy Internal.dll from Releases
+- Inject via Extreme Injector v3.7.2 and set injection method to Manual Map
+- Make sure game is in windowed fullscreen or windowed
+- If ESP does't automatically appear, press F11 to unload then inject once in game
 
 
+Do not scramble the DLL as it will likely crash the game. If it crashes while not scrambled then the offsets must be updated.
+Windows Defender will likely flag Extreme Injector. You have to make an exception when the notification appears when launching Extreme Injector, select "allow on device." If Windows Defender is still removing the file then turn off real-time protection.
 
+# Adding soon
+- Option to only use Bone or Box ESP exclusively
+- Spinbot
+- Anti-aim
+- Chams
+- Interactive ImGUI menu
