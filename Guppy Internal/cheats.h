@@ -9,7 +9,7 @@
 
 #include "client_dll.hpp"
 #include "buttons.hpp"
-#include "offsets.h"
+#include "offsets.hpp"
 #include "input.h"
 
 template <typename T>
@@ -135,21 +135,21 @@ void RunBhop(uintptr_t local_pawn, uintptr_t clientBase) {
     if (!settings.bhopEnabled) return;
 
     // OPT: single read for flags; GetAsyncKeyState is cheap enough.
-    const auto flags = read<std::uint32_t>(local_pawn + exitscam::schemas::client_dll::C_BaseEntity::m_fFlags);
+    const auto flags = read<std::uint32_t>(local_pawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_fFlags);
     const bool in_air = flags & (1 << 0);
     const bool space_pressed = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-    const auto force_jump = read<DWORD>(clientBase + exitscam::buttons::jump);
+    const auto force_jump = read<DWORD>(clientBase + cs2_dumper::buttons::jump);
 
     if (space_pressed && in_air) {
         // OPT: removed Sleep(5) — it stalls the whole overlay thread for 5ms every
         // jump tick. Write immediately; the game reads the jump state next tick anyway.
-        write(clientBase + exitscam::buttons::jump, 65537);
+        write(clientBase + cs2_dumper::buttons::jump, 65537);
     }
     else if (space_pressed && !in_air) {
-        write(clientBase + exitscam::buttons::jump, 256);
+        write(clientBase + cs2_dumper::buttons::jump, 256);
     }
     else if (!space_pressed && force_jump == 65537) {
-        write(clientBase + exitscam::buttons::jump, 256);
+        write(clientBase + cs2_dumper::buttons::jump, 256);
     }
 }
 
@@ -170,7 +170,7 @@ void runAimbot(uintptr_t clientBase,
     float bestFov = settings.aimbotFov;
     Vector3 bestTargetPos = { 0, 0, 0 };
     bool targetFound = false;
-    QAngle currentAngle = read<QAngle>(clientBase + exitscam::offsets::client_dll::dwViewAngles);
+    QAngle currentAngle = read<QAngle>(clientBase + cs2_dumper::offsets::client_dll::dwViewAngles);
 
     for (uintptr_t CSPlayerPawnPtr : cachedPawns) {
         // OPT: team from cache instead of RPM per frame
@@ -181,7 +181,7 @@ void runAimbot(uintptr_t clientBase,
         if (settings.teamCheck && team == localteam) continue;
 
         // OPT: health still needs to be live (damage changes), but one read is cheap.
-        int health = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
+        int health = read<int>(CSPlayerPawnPtr + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth);
         if (health <= 0 || health > 100) continue;
 
         uintptr_t boneArray = 0;
@@ -193,7 +193,7 @@ void runAimbot(uintptr_t clientBase,
         Vector3 headPos;
         if (!getBonePosition(CSPlayerPawnPtr, 7, headPos, boneArray)) continue;
 
-        bool isSpotted = read<bool>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_CSPlayerPawn::m_entitySpottedState + 0x8);
+        bool isSpotted = read<bool>(CSPlayerPawnPtr + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_entitySpottedState + 0x8);
         if (!isSpotted) continue;
 
         QAngle targetAngle = calcAngle(localEye, headPos);
@@ -219,14 +219,14 @@ void runAimbot(uintptr_t clientBase,
         newAngle.y = currentAngle.y + (targetAngle.y - currentAngle.y) / smooth;
         newAngle.z = 0.0f;
 
-        write(clientBase + exitscam::offsets::client_dll::dwViewAngles, newAngle);
+        write(clientBase + cs2_dumper::offsets::client_dll::dwViewAngles, newAngle);
     }
 }
 
 void RunTriggerbot(uintptr_t clientBase, uintptr_t local_pawn, uintptr_t entityList, int localTeam, int localHealth) {
     if (!settings.triggerbotEnabled) {
         if (settings.isTriggering) {
-            write(clientBase + exitscam::buttons::attack, 256);
+            write(clientBase + cs2_dumper::buttons::attack, 256);
             settings.isTriggering = false;
         }
         return;
@@ -234,14 +234,14 @@ void RunTriggerbot(uintptr_t clientBase, uintptr_t local_pawn, uintptr_t entityL
 
     bool shouldShoot = false;
     if (localHealth > 0) {
-        int crosshairEntIndex = read<int>(local_pawn + exitscam::schemas::client_dll::C_CSPlayerPawn::m_iIDEntIndex);
+        int crosshairEntIndex = read<int>(local_pawn + cs2_dumper::schemas::client_dll::C_CSPlayerPawn::m_iIDEntIndex);
         if (crosshairEntIndex != -1) {
             uintptr_t triggerListEntry2 = read<uintptr_t>(entityList + 0x8 * ((crosshairEntIndex & 0x7FFF) >> 9) + 0x10);
             if (triggerListEntry2) {
                 uintptr_t targetPawn = read<uintptr_t>(triggerListEntry2 + 0x70 * (crosshairEntIndex & 0x1FF));
                 if (targetPawn) {
-                    int targetHealth = read<int>(targetPawn + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
-                    int targetTeam = read<int>(targetPawn + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
+                    int targetHealth = read<int>(targetPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth);
+                    int targetTeam = read<int>(targetPawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum);
                     if (targetHealth > 0 && targetHealth <= 100) {
                         if (!settings.teamCheck || targetTeam != localTeam) shouldShoot = true;
                     }
@@ -259,13 +259,13 @@ void RunTriggerbot(uintptr_t clientBase, uintptr_t local_pawn, uintptr_t entityL
             //   DWORD now = GetTickCount();
             //   if (now - lastShot < (DWORD)(17 + rand() % 12)) return;
             //   lastShot = now;
-            write(clientBase + exitscam::buttons::attack, 65537);
+            write(clientBase + cs2_dumper::buttons::attack, 65537);
             settings.isTriggering = true;
         }
     }
     else {
         if (settings.isTriggering) {
-            write(clientBase + exitscam::buttons::attack, 256);
+            write(clientBase + cs2_dumper::buttons::attack, 256);
             settings.isTriggering = false;
         }
     }

@@ -30,9 +30,6 @@
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="offsets.h">
-      <Filter>Source Files\Offsets</Filter>
-    </ClInclude>
     <ClInclude Include="buttons.hpp">
       <Filter>Source Files\Offsets</Filter>
     </ClInclude>
@@ -69,9 +66,6 @@
     <ClInclude Include="buffer.h">
       <Filter>Source Files\MinHook</Filter>
     </ClInclude>
-    <ClInclude Include="scenesystem_dll.hpp">
-      <Filter>Source Files\Offsets</Filter>
-    </ClInclude>
     <ClInclude Include="DX11ImGui.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -80,6 +74,9 @@
     </ClInclude>
     <ClInclude Include="cheats.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="offsets.hpp">
+      <Filter>Source Files\Offsets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -171,9 +171,8 @@
     <ClInclude Include="DX11ImGui.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="input.h" />
-    <ClInclude Include="offsets.h" />
+    <ClInclude Include="offsets.hpp" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="scenesystem_dll.hpp" />
     <ClInclude Include="trampoline.h" />
   </ItemGroup>
   <ItemGroup>

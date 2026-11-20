@@ -4,7 +4,7 @@
 #include <string>
 #include "buttons.hpp"
 #include "client_dll.hpp"
-#include "offsets.h"
+#include "offsets.hpp"
 #include "input.h"
 #include "cheats.h"
 #include "DX11ImGui.h"
@@ -70,10 +70,7 @@ static bool RunOverlay(HMODULE hModule)
     }
     classRegistered = true;
 
-    hwndOverlay = CreateWindowEx(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-        wc.lpszClassName, L"", WS_POPUP, tl.x, tl.y, cr.right, cr.bottom,
-        nullptr, nullptr, wc.hInstance, nullptr);
+    hwndOverlay = CreateWindowEx(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, wc.lpszClassName, L"", WS_POPUP, tl.x, tl.y, cr.right, cr.bottom, nullptr, nullptr, wc.hInstance, nullptr);
     if (!hwndOverlay) {
         printf("Failed to create overlay window! Error: %d\n", GetLastError());
         return false;
@@ -105,9 +102,9 @@ static bool RunOverlay(HMODULE hModule)
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
 
-    const auto entityList = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwEntityList);
-    const auto viewMatrixPtr = clientBase + exitscam::offsets::client_dll::dwViewMatrix;
-    const auto local_player_pawn = read<uintptr_t>(clientBase + exitscam::offsets::client_dll::dwLocalPlayerPawn);
+    const auto entityList = read<uintptr_t>(clientBase + cs2_dumper::offsets::client_dll::dwEntityList);
+    const auto viewMatrixPtr = clientBase + cs2_dumper::offsets::client_dll::dwViewMatrix;
+    const auto local_player_pawn = read<uintptr_t>(clientBase + cs2_dumper::offsets::client_dll::dwLocalPlayerPawn);
     std::unordered_map<uintptr_t, uintptr_t> boneArrayCache;
     std::unordered_map<uintptr_t, PlayerMeta> metaCache;
     std::vector<uintptr_t> cachedControllers;
@@ -173,8 +170,8 @@ static bool RunOverlay(HMODULE hModule)
 
         if (local_player_pawn != 0) {
             std::array<float, 16> viewMatrix = read<std::array<float, 16>>(viewMatrixPtr);
-            int localHealth = read<int>(local_player_pawn + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
-            int localTeam = read<int>(local_player_pawn + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
+            int localHealth = read<int>(local_player_pawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth);
+            int localTeam = read<int>(local_player_pawn + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum);
 
             RunBhop(local_player_pawn, clientBase);
 
@@ -188,7 +185,7 @@ static bool RunOverlay(HMODULE hModule)
                     uintptr_t playerController = read<uintptr_t>(listEntry + i * 0x70);
                     if (!playerController) continue;
 
-                    uintptr_t playerPawnID = read<uintptr_t>(playerController + exitscam::schemas::client_dll::CCSPlayerController::m_hPlayerPawn);
+                    uintptr_t playerPawnID = read<uintptr_t>(playerController + cs2_dumper::schemas::client_dll::CCSPlayerController::m_hPlayerPawn);
                     if (!playerPawnID) continue;
 
                     uintptr_t listEntry2 = read<uintptr_t>(entityList + 0x8 * ((playerPawnID & 0x7FFF) >> 9) + 0x10);
@@ -201,8 +198,8 @@ static bool RunOverlay(HMODULE hModule)
                     cachedPawns.push_back(CSPlayerPawnPtr);
 
                     PlayerMeta meta;
-                    meta.team = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iTeamNum);
-                    nameBuf nbTmp = read<nameBuf>(playerController + exitscam::schemas::client_dll::CBasePlayerController::m_iszPlayerName);
+                    meta.team = read<int>(CSPlayerPawnPtr + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iTeamNum);
+                    nameBuf nbTmp = read<nameBuf>(playerController + cs2_dumper::schemas::client_dll::CBasePlayerController::m_iszPlayerName);
                     memcpy(meta.name, nbTmp.data, sizeof(meta.name));
                     meta.nameValid = true;
                     metaCache[CSPlayerPawnPtr] = meta;
@@ -222,7 +219,7 @@ static bool RunOverlay(HMODULE hModule)
                 lastCacheTime = GetTickCount64();
             }
 
-            oldOrigin localPos = read<oldOrigin>(local_player_pawn + exitscam::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
+            oldOrigin localPos = read<oldOrigin>(local_player_pawn + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
             Vector3 localEye = { localPos.cords[0], localPos.cords[1], localPos.cords[2] + 64.0f };
 
             if (settings.aimbotEnabled) {
@@ -237,8 +234,8 @@ static bool RunOverlay(HMODULE hModule)
 
                     if (CSPlayerPawnPtr == local_player_pawn) continue;
 
-                    oldOrigin player = read<oldOrigin>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
-                    int health = read<int>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_iHealth);
+                    oldOrigin player = read<oldOrigin>(CSPlayerPawnPtr + cs2_dumper::schemas::client_dll::C_BasePlayerPawn::m_vOldOrigin);
+                    int health = read<int>(CSPlayerPawnPtr + cs2_dumper::schemas::client_dll::C_BaseEntity::m_iHealth);
                     int team = 0;
                     auto mIt = metaCache.find(CSPlayerPawnPtr);
                     if (mIt != metaCache.end()) team = mIt->second.team;
@@ -298,7 +295,7 @@ static bool RunOverlay(HMODULE hModule)
                             boneArray = it->second;
                         }
                         else {
-                            uintptr_t gsn = read<uintptr_t>(CSPlayerPawnPtr + exitscam::schemas::client_dll::C_BaseEntity::m_pGameSceneNode);
+                            uintptr_t gsn = read<uintptr_t>(CSPlayerPawnPtr + cs2_dumper::schemas::client_dll::C_BaseEntity::m_pGameSceneNode);
                             if (gsn > 0x10000 && gsn < 0x00007FFFFFFFFFFF) {
                                 boneArray = read<uintptr_t>(gsn + 0x1c0);
                                 if (boneArray > 0x10000 && boneArray < 0x00007FFFFFFFFFFF) {
